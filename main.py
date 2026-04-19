@@ -1,4 +1,5 @@
 ﻿import os
+import random
 from datetime import datetime, timedelta, timezone
 
 import discord
@@ -54,6 +55,28 @@ async def on_member_join(member: discord.Member):
 @bot.command()
 async def ping(ctx):
     await ctx.send("Pong!")
+
+
+@bot.command()
+async def hello(ctx):
+    await ctx.send(f"おはこんばんは、{ctx.author.mention} さん！")
+
+
+@bot.command()
+async def dice(ctx):
+    value = random.randint(1, 6)
+    await ctx.send(f"{ctx.author.mention} のサイコロ結果: {value}")
+
+
+@bot.command()
+async def omikuji(ctx):
+    results = ["大吉", "中吉", "小吉", "吉", "末吉", "凶"]
+    await ctx.send(f"{ctx.author.mention} のおみくじ結果: {random.choice(results)}")
+
+
+@bot.command(name="helpme")
+async def helpme(ctx):
+    await ctx.send("使えるコマンド: !ping / !hello / !dice / !omikuji / !helpme")
 
 
 bot.run(TOKEN)
