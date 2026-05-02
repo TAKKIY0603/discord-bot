@@ -140,12 +140,11 @@ def classify_url(url: str) -> str | None:
 
 
 async def relay_media_if_needed(message: discord.Message) -> bool:
-    if not MEDIA_RELAY_CHANNEL_ID or not MEDIA_RELAY_CHANNEL_ID.isdigit():
-        return False
-
-    relay_channel = bot.get_channel(int(MEDIA_RELAY_CHANNEL_ID))
-    if relay_channel is None or relay_channel.id == message.channel.id:
-        return False
+    relay_channel = message.channel
+    if MEDIA_RELAY_CHANNEL_ID and MEDIA_RELAY_CHANNEL_ID.isdigit():
+        configured_channel = bot.get_channel(int(MEDIA_RELAY_CHANNEL_ID))
+        if configured_channel is not None:
+            relay_channel = configured_channel
 
     relayed = False
 
