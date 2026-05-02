@@ -2,6 +2,7 @@
 import json
 import os
 import random
+import re
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,7 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 WELCOME_CHANNEL_ID = os.getenv("WELCOME_CHANNEL_ID")
 VOICE_LOG_CHANNEL_ID = os.getenv("VOICE_LOG_CHANNEL_ID")
+MEDIA_RELAY_CHANNEL_ID = os.getenv("MEDIA_RELAY_CHANNEL_ID")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -73,6 +75,9 @@ PREF_CITY_MAP = {
     "鹿児島県": "Kagoshima",
     "沖縄県": "Naha",
 }
+URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+VIDEO_EXTENSIONS = (".mp4", ".webm", ".mov", ".m4v")
 
 
 def get_welcome_message(member: discord.Member) -> str:
@@ -105,6 +110,65 @@ def fetch_today_weather(city: str) -> tuple[str, str, str]:
     max_temp = today["maxtempC"]
     min_temp = today["mintempC"]
     return weather_text, max_temp, min_temp
+
+
+def normalize_url(url: str) -> str:
+    return url.split("?")[0].split("#")[0].lower()
+
+
+def classify_url(url: str) -> str | None:
+    normalized = normalize_url(url)
+    if normalized.endswith(IMAGE_EXTENSIONS):
+        return "image"
+    if normalized.endswith(VIDEO_EXTENSIONS):
+        return "video"
+    return None
+
+
+async def relay_media_if_needed(message: discord.Message) -> bool:
+    if not MEDIA_RELAY_CHANNEL_ID or not MEDIA_RELAY_CHANNEL_ID.isdigit():
+        return False
+
+    relay_channel = bot.get_channel(int(MEDIA_RELAY_CHANNEL_ID))
+    if relay_channel is None or relay_channel.id == message.channel.id:
+        return False
+
+    relayed = False
+
+    for url in URL_PATTERN.findall(message.content):
+        kind = classify_url(url)
+        if kind == "image":
+            await relay_channel.send(f"[画像リンク転載] 送信者: {message.author.mention}\n{url}")
+            relayed = True
+        elif kind == "video":
+            await relay_channel.send(f"[動画リンク転載] 送信者: {message.author.mention}\n{url}")
+            relayed = True
+
+    for attachment in message.attachments:
+        name = attachment.filename.lower()
+        if name.endswith(IMAGE_EXTENSIONS):
+            await relay_channel.send(
+                f"[画像添付転載] 送信者: {message.author.mention}",
+                file=await attachment.to_file(),
+            )
+            relayed = True
+            continue
+
+        if name.endswith(VIDEO_EXTENSIONS):
+            duration = getattr(attachment, "duration", None)
+            if duration is None or duration <= 180:
+                await relay_channel.send(
+                    f"[動画添付転載] 送信者: {message.author.mention}",
+                    file=await attachment.to_file(),
+                )
+                relayed = True
+            else:
+                await relay_channel.send(
+                    f"[動画スキップ] 3分超のため転載しませんでした: {attachment.url}"
+                )
+                relayed = True
+
+    return relayed
 
 
 @bot.event
@@ -162,13 +226,17 @@ async def on_voice_state_update(
 
 @bot.event
 async def on_message(message: discord.Message):
-    # Ignore only this bot's own messages to avoid self-reply loops.
     if bot.user and message.author.id == bot.user.id:
         return
 
     content = message.content.strip()
     lowered = content.lower()
     print(f"[on_message] author={message.author} dm={message.guild is None} content={content}")
+
+    try:
+        await relay_media_if_needed(message)
+    except Exception as exc:
+        print(f"[relay_media_if_needed] error: {exc}")
 
     if "こんにちは" in content:
         await message.channel.send("こんにちは！")
