@@ -103,6 +103,12 @@ async def on_message(message: discord.Message):
         await message.channel.send("おはよう！")
     elif "おやすみ" in content:
         await message.channel.send("おやすみ！")
+    elif "死ね" in content:
+        await message.channel.send("その言葉はやめよう。落ち着いて話そう。")
+    elif "ばか" in content or "バカ" in content or "馬鹿" in content:
+        await message.channel.send("悪口はなしでいこう。")
+    elif "やりますねぇ" in content:
+        await message.channel.send("やりますやります！")
     elif "ping" in lowered:
         await message.channel.send("Pong!")
 
