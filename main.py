@@ -1,5 +1,9 @@
-﻿import os
+﻿import asyncio
+import json
+import os
 import random
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import discord
@@ -20,6 +24,55 @@ intents.dm_messages = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 JST = timezone(timedelta(hours=9))
+PREF_CITY_MAP = {
+    "北海道": "Sapporo",
+    "青森県": "Aomori",
+    "岩手県": "Morioka",
+    "宮城県": "Sendai",
+    "秋田県": "Akita",
+    "山形県": "Yamagata",
+    "福島県": "Fukushima",
+    "茨城県": "Mito",
+    "栃木県": "Utsunomiya",
+    "群馬県": "Maebashi",
+    "埼玉県": "Saitama",
+    "千葉県": "Chiba",
+    "東京都": "Tokyo",
+    "神奈川県": "Yokohama",
+    "新潟県": "Niigata",
+    "富山県": "Toyama",
+    "石川県": "Kanazawa",
+    "福井県": "Fukui",
+    "山梨県": "Kofu",
+    "長野県": "Nagano",
+    "岐阜県": "Gifu",
+    "静岡県": "Shizuoka",
+    "愛知県": "Nagoya",
+    "三重県": "Tsu",
+    "滋賀県": "Otsu",
+    "京都府": "Kyoto",
+    "大阪府": "Osaka",
+    "兵庫県": "Kobe",
+    "奈良県": "Nara",
+    "和歌山県": "Wakayama",
+    "鳥取県": "Tottori",
+    "島根県": "Matsue",
+    "岡山県": "Okayama",
+    "広島県": "Hiroshima",
+    "山口県": "Yamaguchi",
+    "徳島県": "Tokushima",
+    "香川県": "Takamatsu",
+    "愛媛県": "Matsuyama",
+    "高知県": "Kochi",
+    "福岡県": "Fukuoka",
+    "佐賀県": "Saga",
+    "長崎県": "Nagasaki",
+    "熊本県": "Kumamoto",
+    "大分県": "Oita",
+    "宮崎県": "Miyazaki",
+    "鹿児島県": "Kagoshima",
+    "沖縄県": "Naha",
+}
 
 
 def get_welcome_message(member: discord.Member) -> str:
@@ -32,6 +85,26 @@ def get_welcome_message(member: discord.Member) -> str:
     if 18 <= hour < 23:
         return f"こんばんは！ {member.mention} さん、ゆっくりしていってね！"
     return f"夜遅くにようこそ！ {member.mention} さん、来てくれてありがとう！"
+
+
+def extract_prefecture(text: str) -> str | None:
+    for pref in PREF_CITY_MAP:
+        if pref in text:
+            return pref
+    return None
+
+
+def fetch_today_weather(city: str) -> tuple[str, str, str]:
+    q = urllib.parse.quote(city)
+    url = f"https://wttr.in/{q}?format=j1"
+    with urllib.request.urlopen(url, timeout=10) as response:
+        data = json.loads(response.read().decode("utf-8"))
+
+    today = data["weather"][0]
+    weather_text = today["hourly"][4]["weatherDesc"][0]["value"]
+    max_temp = today["maxtempC"]
+    min_temp = today["mintempC"]
+    return weather_text, max_temp, min_temp
 
 
 @bot.event
@@ -109,6 +182,20 @@ async def on_message(message: discord.Message):
         await message.channel.send("悪口はなしでいこう。")
     elif "やりますねぇ" in content:
         await message.channel.send("やりますやります！")
+    elif "hey" in lowered and "今日" in content and "天気" in content:
+        pref = extract_prefecture(content)
+        if not pref:
+            await message.channel.send("都道府県名を入れて聞いてね。（例: Hey 今日の大阪府の天気は？）")
+        else:
+            city = PREF_CITY_MAP[pref]
+            try:
+                weather_text, max_temp, min_temp = await asyncio.to_thread(fetch_today_weather, city)
+                await message.channel.send(
+                    f"{pref}（{city}）の今日の天気: {weather_text}\n"
+                    f"最高気温: {max_temp}℃ / 最低気温: {min_temp}℃"
+                )
+            except Exception:
+                await message.channel.send("天気情報の取得に失敗しました。少し待ってもう一度試してね。")
     elif "ping" in lowered:
         await message.channel.send("Pong!")
 
