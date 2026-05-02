@@ -78,6 +78,9 @@ PREF_CITY_MAP = {
 URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 VIDEO_EXTENSIONS = (".mp4", ".webm", ".mov", ".m4v")
+YOUTUBE_DOMAINS = ("youtube.com", "youtu.be")
+TIKTOK_DOMAINS = ("tiktok.com",)
+X_DOMAINS = ("x.com", "twitter.com")
 
 
 def get_welcome_message(member: discord.Member) -> str:
@@ -118,10 +121,21 @@ def normalize_url(url: str) -> str:
 
 def classify_url(url: str) -> str | None:
     normalized = normalize_url(url)
+    parsed = urllib.parse.urlparse(url)
+    netloc = parsed.netloc.lower()
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+
     if normalized.endswith(IMAGE_EXTENSIONS):
         return "image"
     if normalized.endswith(VIDEO_EXTENSIONS):
         return "video"
+    if any(d in netloc for d in YOUTUBE_DOMAINS):
+        return "youtube"
+    if any(d in netloc for d in TIKTOK_DOMAINS):
+        return "tiktok"
+    if any(d in netloc for d in X_DOMAINS):
+        return "x"
     return None
 
 
@@ -142,6 +156,15 @@ async def relay_media_if_needed(message: discord.Message) -> bool:
             relayed = True
         elif kind == "video":
             await relay_channel.send(f"[動画リンク転載] 送信者: {message.author.mention}\n{url}")
+            relayed = True
+        elif kind == "youtube":
+            await relay_channel.send(f"[YouTube転載] 送信者: {message.author.mention}\n{url}")
+            relayed = True
+        elif kind == "tiktok":
+            await relay_channel.send(f"[TikTok転載] 送信者: {message.author.mention}\n{url}")
+            relayed = True
+        elif kind == "x":
+            await relay_channel.send(f"[X転載] 送信者: {message.author.mention}\n{url}")
             relayed = True
 
     for attachment in message.attachments:
