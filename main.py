@@ -139,6 +139,29 @@ def classify_url(url: str) -> str | None:
     return None
 
 
+def transform_social_url(url: str, kind: str) -> str:
+    parsed = urllib.parse.urlparse(url)
+    netloc = parsed.netloc
+    if kind == "x":
+        if "x.com" in netloc:
+            netloc = netloc.replace("x.com", "fixupx.com")
+        elif "twitter.com" in netloc:
+            netloc = netloc.replace("twitter.com", "fixupx.com")
+    elif kind == "tiktok":
+        if "tiktok.com" in netloc:
+            netloc = netloc.replace("tiktok.com", "vxtiktok.com")
+    return urllib.parse.urlunparse(
+        (
+            parsed.scheme or "https",
+            netloc,
+            parsed.path,
+            parsed.params,
+            parsed.query,
+            parsed.fragment,
+        )
+    )
+
+
 async def relay_media_if_needed(message: discord.Message) -> bool:
     relay_channel = message.channel
     if MEDIA_RELAY_CHANNEL_ID and MEDIA_RELAY_CHANNEL_ID.isdigit():
@@ -160,10 +183,16 @@ async def relay_media_if_needed(message: discord.Message) -> bool:
             await relay_channel.send(f"[YouTube転載] 送信者: {message.author.mention}\n{url}")
             relayed = True
         elif kind == "tiktok":
-            await relay_channel.send(f"[TikTok転載] 送信者: {message.author.mention}\n{url}")
+            embed_url = transform_social_url(url, "tiktok")
+            await relay_channel.send(
+                f"[TikTok転載] 送信者: {message.author.mention}\n{embed_url}"
+            )
             relayed = True
         elif kind == "x":
-            await relay_channel.send(f"[X転載] 送信者: {message.author.mention}\n{url}")
+            embed_url = transform_social_url(url, "x")
+            await relay_channel.send(
+                f"[X転載] 送信者: {message.author.mention}\n{embed_url}"
+            )
             relayed = True
 
     for attachment in message.attachments:
